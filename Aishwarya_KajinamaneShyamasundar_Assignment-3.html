@@ -1,143 +1,166 @@
 <!DOCTYPE html>
-<head>
-  <title>Network Visualization using d3.js</title>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <style>
-    html, body {
-      width: 100%;
-      height: 100%;
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-    }
-
-    #Title {
-      position: absolute;
-      top: 2vh;
-      left: 10vw;
-      width: 80vw;
-      font-family: sans-serif;
-      font-size: 24pt;
-      font-weight: bold;
-      color: #333;
-      text-align: center;
-    }
-
-    svg {
-      position: absolute;
-      top: 10vh;
-      left: 0;
-      width: 100vw;
-      height: 90vh;
-      border: 1px solid #ccc;
-    }
-
-    .link {
-      stroke: #aaa;
-      stroke-opacity: 0.3;
-    }
-
-    .node {
-      stroke: white;
-      stroke-width: 1.5px;
-    }
-  </style>
-</head>
-<body>
-  <div id="Title">Interactive Network Graph</div>
-  <svg></svg>
-
-  <script>
-    d3.json("Emails_Graph_kmeans.json").then((graphData) => {
-      const canvas = d3.select("svg"); 
-      initializeGraph(graphData, canvas);
-    }).catch(err => console.error("Failed to load data:", err));
-
-    function initializeGraph(data, svgEl) {
-      const W = 1800, H = 100;
-
-      svgEl.attr("viewBox", `${-W / 2} ${-H / 2} ${W} ${H}`);
-
-      const graphGroup = svgEl.append("g");
-
-      const sizeScale = d3.scaleSqrt()
-        .domain(d3.extent(data.nodes, d => d.degree))
-        .range([2, 20]);
-
-      const colorScale = d3.scaleOrdinal(d3.schemeCategory10)
-        .domain([...new Set(data.nodes.map(d => d.cluster_label))]);
-
-      const linkElements = graphGroup.selectAll("line")
-        .data(data.links)
-        .enter()
-        .append("line")
-        .attr("class", "link");
-
-      const nodeElements = graphGroup.selectAll("circle")
-        .data(data.nodes)
-        .enter()
-        .append("circle")
-        .attr("class", "node")
-        .attr("r", d => sizeScale(d.degree))
-        .attr("fill", d => colorScale(d.cluster_label))
-        .on("mouseover", handleMouseEnter)
-        .on("mouseout", handleMouseLeave);
-
-      const labelElements = graphGroup.selectAll("text")
-        .data(data.nodes)
-        .enter()
-        .append("text")
-        .text(d => d.id)
-        .attr("dy", d => -sizeScale(d.degree) - 2)
-        .style("font-size", d => `${sizeScale(d.degree)}px`)
-        .style("text-anchor", "middle");
-
-      const simulation = d3.forceSimulation(data.nodes)
-        .force("link", d3.forceLink(data.links).id(d => d.id).distance(50).strength(0.01))
-        .force("charge", d3.forceManyBody().strength(3))
-        .force("center", d3.forceCenter(0, 0))
-        .force("collide", d3.forceCollide(d => sizeScale(d.degree) + 20))
-        .force("radial", d3.forceRadial(Math.min(W, H) / 3, W / 2, H / 2))
-        .on("tick", applyPositions);
-
-      function applyPositions() {
-        linkElements
-          .attr("x1", d => d.source.x)
-          .attr("y1", d => d.source.y)
-          .attr("x2", d => d.target.x)
-          .attr("y2", d => d.target.y);
-
-        nodeElements
-          .attr("cx", d => d.x)
-          .attr("cy", d => d.y);
-
-        labelElements
-          .attr("x", d => d.x)
-          .attr("y", d => d.y);
+<html>
+  <head>
+    <title>Graphical Network Display</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      body, html {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
       }
-
-      function handleMouseEnter(event, nodeData) {
-        const cluster = nodeData.cluster_label;
-
-        nodeElements.style("opacity", n => n.cluster_label === cluster ? 1 : 0.1);
-        labelElements.style("opacity", n => n.cluster_label === cluster ? 1 : 0);
-        linkElements.style("opacity", l =>
-          l.source.cluster_label === cluster && l.target.cluster_label === cluster ? 0.6 : 0.1
-        );
+      #mainHeading {
+        position: absolute;
+        top: 2%;
+        left: 10%;
+        width: 80%;
+        font-family: 'Times New Roman', serif;
+        font-size: 24px;
+        font-weight: bold;
+        color: #2980b9;
+        text-align: center;
       }
-
-      function handleMouseLeave() {
-        nodeElements.style("opacity", 1);
-        labelElements.style("opacity", 1);
-        linkElements.style("opacity", 0.3);
+      #canvasArea {
+        position: absolute;
+        top: 10%;
+        left: 0;
+        width: 100%;
+        height: 90%;
+        border: 1px solid #ddd;
       }
+      .edgeStyle {
+        stroke: #7f8c8d;
+        stroke-opacity: 0.3;
+      }
+      .nodeStyle {
+        stroke: white;
+        stroke-width: 1.5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="mainHeading">Interactive Graph Interface</div>
+    <svg id="canvasArea"></svg>
+    <script>
+      (function() {
+        class GraphNetwork {
+          constructor(dataURL, canvasSelector) {
+            this.dataURL = dataURL;
+            this.canvas = d3.select(canvasSelector);
+            this.width = 1800;
+            this.height = 100;
+            this.layer = null;
+          }
 
-      svgEl.call(
-        d3.zoom()
-          .scaleExtent([0.5, 4])
-          .on("zoom", event => graphGroup.attr("transform", event.transform))
-      );
-    }
-  </script>
-</body>
+          init() {
+            this.canvas.attr("viewBox", `${-this.width/2} ${-this.height/2} ${this.width} ${this.height}`);
+            this.layer = this.canvas.append("g");
+            this.fetchData();
+            this.enableZoom();
+          }
+
+          async fetchData() {
+            try {
+              const dataset = await d3.json(this.dataURL);
+              this.buildVisualization(dataset);
+            } catch (error) {
+              console.error("Data retrieval error:", error);
+            }
+          }
+
+          buildVisualization(dataset) {
+            const scaleRadius = d3.scaleSqrt()
+              .domain(d3.extent(dataset.nodes, node => node.degree))
+              .range([2, 20]);
+
+            const colorAssigner = d3.scaleOrdinal(d3.schemeCategory10)
+              .domain([...new Set(dataset.nodes.map(node => node.cluster_label))]);
+
+            const edges = this.layer.selectAll("line")
+              .data(dataset.links)
+              .enter()
+              .append("line")
+              .attr("class", "edgeStyle");
+
+            const nodes = this.layer.selectAll("circle")
+              .data(dataset.nodes)
+              .enter()
+              .append("circle")
+              .attr("class", "nodeStyle")
+              .attr("r", d => scaleRadius(d.degree))
+              .attr("fill", d => colorAssigner(d.cluster_label))
+              .on("mouseover", (event, d) => this.activateCluster(d, nodes, edges, texts, scaleRadius))
+              .on("mouseout", () => this.deactivateCluster(nodes, edges, texts));
+
+            const texts = this.layer.selectAll("text")
+              .data(dataset.nodes)
+              .enter()
+              .append("text")
+              .text(d => d.id)
+              .attr("dy", d => -scaleRadius(d.degree) - 2)
+              .style("font-size", d => `${scaleRadius(d.degree)}px`)
+              .style("text-anchor", "middle");
+
+            const simulation = d3.forceSimulation(dataset.nodes)
+              .force("link", d3.forceLink(dataset.links)
+                .id(d => d.id)
+                .distance(50)
+                .strength(0.01)
+              )
+              .force("repel", d3.forceManyBody().strength(3))
+              .force("centerForce", d3.forceCenter(0, 0))
+              .force("collisionForce", d3.forceCollide(d => scaleRadius(d.degree) + 20))
+              .force("radialForce", d3.forceRadial(Math.min(this.width, this.height) / 3, this.width / 2, this.height / 2))
+              .on("tick", tickUpdates);
+
+            const that = this;
+            function tickUpdates() {
+              edges
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y);
+
+              nodes
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y);
+
+              texts
+                .attr("x", d => d.x)
+                .attr("y", d => d.y);
+            }
+          }
+
+          activateCluster(hoveredNode, nodeSel, edgeSel, textSel, radiusScale) {
+            const clusterKey = hoveredNode.cluster_label;
+            nodeSel.style("opacity", d => d.cluster_label === clusterKey ? 1 : 0.1);
+            textSel.style("opacity", d => d.cluster_label === clusterKey ? 1 : 0);
+            edgeSel.style("opacity", d => (d.source.cluster_label === clusterKey && d.target.cluster_label === clusterKey) ? 0.6 : 0.1);
+          }
+
+          deactivateCluster(nodeSel, edgeSel, textSel) {
+            nodeSel.style("opacity", 1);
+            textSel.style("opacity", 1);
+            edgeSel.style("opacity", 0.3);
+          }
+
+          enableZoom() {
+            this.canvas.call(d3.zoom()
+              .scaleExtent([0.5, 4])
+              .on("zoom", (event) => {
+                this.layer.attr("transform", event.transform);
+              })
+            );
+          }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+          const networkGraph = new GraphNetwork("Emails_Graph_kmeans.json", "#canvasArea");
+          networkGraph.init();
+        });
+      })();
+    </script>
+  </body>
 </html>
