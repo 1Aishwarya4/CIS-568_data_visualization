@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>TreeMap Of The Data</title>
+    <style>
+     
+      html, body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        font-family: sans-serif;
+      }
+     
+      .page-header {
+        width: 1000px;
+        margin: 0 auto;
+        background-color: #fdfcfc;
+        text-align: center;
+        padding: 12px 0;
+        font-size: 2em;      
+        font-weight: bold;
+      }
+    
+      .chart-area {
+        height: 90%;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-header">Visualization Of TreeMap</div>
+    <div id="container" class="chart-area"></div>
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <script type="text/javascript">
+
+      const fetchData = () => ([
+        { id: 'A', label: 'A', parentId: null, style: { color: '#555' } },
+        { id: 'B', label: 'B', parentId: 'A', style: { color: '#555' } },
+        { id: 'C', label: 'C', parentId: 'A', style: { color: '#555' } },
+        { id: 'D', label: 'D', parentId: 'B', value: 30, style: { borderColor: '#e8aa63' } },
+        { id: 'E', label: 'E', parentId: 'B', value: 50, style: { borderColor: '#e8aa63' } },
+        { id: 'F', label: 'F', parentId: 'C', value: 20, style: { borderColor: '#e8aa63' } },
+        { id: 'G', label: 'G', parentId: 'C', value: 40, style: { borderColor: '#e8aa63' } },
+        { id: 'H', label: 'H', parentId: 'C', value: 60, style: { borderColor: '#e8aa63' } }
+      ]);
+
+      const deepCopy = obj => JSON.parse(JSON.stringify(obj));
+
+      const createLookupMap = dataArray => {
+        const map = {};
+        dataArray.forEach(item => {
+          map[item.id] = {
+            name: item.label,
+            itemStyle: deepCopy(item.style),
+            value: item.value || undefined,
+            children: []
+          };
+        });
+        return map;
+      };
+
+      const constructTree = (data, lookup) => {
+        const treeStructure = [];
+        data.forEach(item => {
+          if (item.parentId) {
+            lookup[item.parentId] && lookup[item.parentId].children.push(lookup[item.id]);
+          } else {
+            treeStructure.push(lookup[item.id]);
+          }
+        });
+        return treeStructure;
+      };
+
+      const setupLevelConfig = () => ([
+        {
+          itemStyle: {
+            color: '#555',
+            borderWidth: 15,
+            gapWidth: 10
+          },
+          upperLabel: { show: true }
+        },
+        {
+          itemStyle: {
+            color: '#52AB80',
+            borderWidth: 5,
+            gapWidth: 5
+          },
+          upperLabel: { show: true }
+        },
+        {
+          itemStyle: {
+            borderColor: '#e8aa63',
+            borderWidth: 5,
+            gapWidth: 2
+          },
+          upperLabel: { show: true }
+        }
+      ]);
+
+      const initializeChart = () => {
+        const rawData = fetchData();
+        const nodeMap = createLookupMap(rawData);
+        const hierarchicalData = constructTree(rawData, nodeMap);
+        const levelsConfig = setupLevelConfig();
+
+        const optionConfig = {
+          tooltip: {},
+          series: [{
+            type: 'treemap',
+            roam: false,
+            data: hierarchicalData,
+            levels: levelsConfig
+          }]
+        };
+
+        const chartEl = document.getElementById('container');
+        const chartInstance = echarts.init(chartEl);
+        chartInstance.setOption(optionConfig);
+      };
+
+      document.addEventListener('DOMContentLoaded', initializeChart);
+    </script>
+  </body>
+</html>
