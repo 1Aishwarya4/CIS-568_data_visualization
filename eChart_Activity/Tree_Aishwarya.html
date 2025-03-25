@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tree Of The Data</title>
+  <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #ffffff;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .titleBar {
+      text-align: center;
+      padding: 20px;
+      font-size: 1.8rem;
+      background-color: #f7f7f7;
+      border-bottom: 1px solid #ccc;
+      color: #333;
+    }
+    #chartZone {
+      width: 100vw;
+      height: calc(100vh - 70px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="titleBar">Visualization of Tree </div>
+  <div id="chartZone"></div>
+
+  <script>
+    const SOURCE_DATA = [
+      { parentColumn: "",  childColumn: "A" },
+      { parentColumn: "A", childColumn: "B" },
+      { parentColumn: "A", childColumn: "C" },
+      { parentColumn: "B", childColumn: "D", val: 30 },
+      { parentColumn: "B", childColumn: "E", val: 50 },
+      { parentColumn: "C", childColumn: "F", val: 20 },
+      { parentColumn: "C", childColumn: "G", val: 40 },
+      { parentColumn: "C", childColumn: "H", val: 60 }
+    ];
+
+    class RadialNode {
+      constructor(name, size, align) {
+        this.name = name;
+        this.symbolSize = size;
+        this.alignment = align;
+        this.children = [];
+      }
+    }
+
+    function fetchAlignment(childIdentifier) {
+      const alignmentMapping = {
+        "B": "left",
+        "D": "left",
+        "E": "right",
+        "F": "left",
+        "G": "right",
+        "H": "left"
+      };
+      return alignmentMapping[childIdentifier] || "center";
+    }
+
+    function calculateAttributes(entry) {
+      let computedSize = 10;
+      let computedAlignment = "center";
+
+      switch (entry.childColumn) {
+        case "A":
+          computedSize = 25;
+          computedAlignment = "right";
+          break;
+        case "C":
+          computedSize = 15;
+          computedAlignment = "right";
+          break;
+        default:
+          if (typeof entry.val === "number") {
+            computedSize = Math.sqrt(entry.val);
+            computedAlignment = fetchAlignment(entry.childColumn);
+          } else if (entry.childColumn === "B") {
+            computedAlignment = "left";
+          }
+      }
+      return { size: computedSize, align: computedAlignment };
+    }
+
+    function generateChartConfig(rootNode) {
+      const seriesSettings = {};
+      seriesSettings.chartType = "tree";
+      seriesSettings.layoutType = "radial";
+      seriesSettings.chartData = [rootNode];
+      seriesSettings.nodeStyle = {
+        shape: "circle",
+        fillColor: "#FFFFFF",
+        border: {
+          color: "#808080",
+          width: 2.5
+        }
+      };
+      seriesSettings.linkStyle = {
+        color: "#4545",
+        width: 2,
+        curveness: 0.5
+      };
+      seriesSettings.animation = {
+        collapseExpand: true,
+        durationInitial: 600,
+        durationUpdate: 800
+      };
+
+      function labelPositionResolver(context) {
+        const nodeAlignment = context.data.alignment;
+        return nodeAlignment === "right" ? "right" : "left";
+      }
+
+      seriesSettings.labelConfig = {
+        pos: labelPositionResolver,
+        offset: 15
+      };
+
+      const configObject = {
+        series: [
+          {
+            type: seriesSettings.chartType,
+            layout: seriesSettings.layoutType,
+            data: seriesSettings.chartData,
+            symbol: seriesSettings.nodeStyle.shape,
+            itemStyle: {
+              color: seriesSettings.nodeStyle.fillColor,
+              borderColor: seriesSettings.nodeStyle.border.color,
+              borderWidth: seriesSettings.nodeStyle.border.width
+            },
+            lineStyle: {
+              color: seriesSettings.linkStyle.color,
+              width: seriesSettings.linkStyle.width,
+              curveness: seriesSettings.linkStyle.curveness
+            },
+            expandAndCollapse: seriesSettings.animation.collapseExpand,
+            animationDuration: seriesSettings.animation.durationInitial,
+            animationDurationUpdate: seriesSettings.animation.durationUpdate,
+            label: {
+              position: seriesSettings.labelConfig.pos,
+              distance: seriesSettings.labelConfig.offset,
+              align: "left",          
+              verticalAlign: "middle"
+            }
+          }
+        ]
+      };
+
+      return configObject;
+    }
+
+    function buildRadialTree(dataArray) {
+      const nodeDict = {};
+
+      dataArray.forEach(entry => {
+        const { size, align } = calculateAttributes(entry);
+        nodeDict[entry.childColumn] = new RadialNode(entry.childColumn, size, align);
+      });
+
+      let identifiedRoot = dataArray.find(rec => !rec.parentColumn);
+      let finalRoot = nodeDict[identifiedRoot.childColumn];
+
+      dataArray
+        .filter(rec => rec.parentColumn)  
+        .forEach(rec => {
+          let parentNode = nodeDict[rec.parentColumn];
+          let childNode = nodeDict[rec.childColumn];
+          if (parentNode && childNode) {
+            parentNode.children.push(childNode);
+          }
+        });
+
+      return finalRoot;
+    }
+
+    function initializeRadialChart() {
+      const rootOfTree = buildRadialTree(SOURCE_DATA);
+      const option = generateChartConfig(rootOfTree);
+      const container = document.getElementById("chartZone");
+      const myChart = echarts.init(container);
+      myChart.setOption(option);
+    }
+
+    document.addEventListener("DOMContentLoaded", initializeRadialChart);
+  </script>
+</body>
+</html>
