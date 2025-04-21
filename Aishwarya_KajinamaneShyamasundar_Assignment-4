@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>CT Scan Contour Heatmap</title>
+
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+  <link   href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css"
+          rel="stylesheet">
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%; font-family: sans-serif;
+      display: flex; flex-direction: column;
+    }
+    #ct-header {
+      padding: 20px; text-align: center;
+      font-size: 2.4rem; font-weight: bold;
+    }
+    #ct-container {
+      flex: 1; display: flex;
+      flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 1rem; padding: 1rem;
+    }
+    #ct-svg {
+      width: 75vh; height: 75vh;
+    }
+    #ct-slider-container {
+      width: 75vh;
+    }
+    #ct-slider {
+      width: 100%;
+      margin: 0 auto;
+    }
+    .ct-labels {
+      display: flex; justify-content: space-between;
+      font-size: 1rem; margin-top: 0.4rem;
+    }
+    .ui-slider {
+      background: #ddd; height: 8px; border-radius: 4px;
+    }
+    .ui-slider-range { background: #bbb; }
+    .ui-slider-handle {
+      width: 16px; height: 16px; margin-top: -4px;
+      background: #fff; border: 2px solid #666;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="ct-header">CT Scan Contour Heatmap</div>
+
+  <div id="ct-container">
+    <svg id="ct-svg" viewBox="0 0 600 600"></svg>
+    <div id="ct-slider-container">
+      <div id="ct-slider"></div>
+      <div class="ct-labels"><span>Min</span><span>Max</span></div>
+    </div>
+  </div>
+
+  <script>
+  (function(d3, $) {
+    class ContourHeatmap {
+      constructor(opts) {
+        this.csvPath = opts.csvPath;
+        this.svgEl   = d3.select(opts.svgSelector);
+        this.slider  = opts.sliderSelector;
+        this.grid    = 512;
+        this.bins    = 10;
+        this.palette = [
+          "#0d1a50","#3e5eba","#2b83ba",
+          "#abdda4","#ffffbf","#fdae61","#d7191c"
+        ];
+      }
+
+      async init() {
+        const rows = await d3.csv(this.csvPath);
+        this.values = rows.map(r => +Object.values(r)[0]);
+        [ this.minVal, this.maxVal ] = d3.extent(this.values);
+        this._setupColorScale();
+        this._createLayer();
+        this._draw(this.minVal, this.maxVal);
+        this._setupSlider();
+      }
+
+      _setupColorScale() {
+        const step = (this.maxVal - this.minVal) / (this.palette.length - 1);
+        const domainStops = d3.range(this.minVal, this.maxVal + 1e-6, step);
+        this.colorScale = d3.scaleLinear()
+          .domain(domainStops)
+          .range(this.palette)
+          .interpolate(d3.interpolateHcl);
+      }
+
+      _createLayer() {
+        this.layer = this.svgEl.append("g")
+          .attr("class", "contour-layer");
+      }
+
+      _draw(lo, hi) {
+        const step = (hi - lo) / this.bins;
+        const thresholds = d3.range(lo, hi, step);
+
+        const cont = d3.contours()
+          .size([this.grid, this.grid])
+          .thresholds(thresholds)(this.values);
+
+        const paths = this.layer.selectAll("path")
+          .data(cont, d => d.value);
+
+        paths.exit().remove();
+
+        paths.enter().append("path")
+          .merge(paths)
+          .attr("d", d3.geoPath())
+          .attr("fill", d => this.colorScale(d.value));
+      }
+
+      _setupSlider() {
+        const self = this;
+        $(this.slider).slider({
+          range: true,
+          min:   this.minVal,
+          max:   this.maxVal,
+          values:[this.minVal, this.maxVal],
+          slide(_e, ui) {
+            self._draw(ui.values[0], ui.values[1]);
+          }
+        });
+      }
+    }
+
+    $(document).ready(() => {
+      new ContourHeatmap({
+        csvPath:      "Data_CT.csv",
+        svgSelector:  "#ct-svg",
+        sliderSelector:"#ct-slider"
+      }).init();
+    });
+  })(d3, jQuery);
+  </script>
+
+</body>
+</html>
