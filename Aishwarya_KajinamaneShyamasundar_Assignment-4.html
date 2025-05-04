@@ -6,8 +6,7 @@
   <script src="https://d3js.org/d3.v6.min.js"></script>
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
   <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
-  <link   href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css"
-          rel="stylesheet">
+  <link href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css" rel="stylesheet">
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -71,10 +70,6 @@
         this.slider  = opts.sliderSelector;
         this.grid    = 512;
         this.bins    = 10;
-        this.palette = [
-          "#0d1a50","#3e5eba","#2b83ba",
-          "#abdda4","#ffffbf","#fdae61","#d7191c"
-        ];
       }
 
       async init() {
@@ -88,12 +83,10 @@
       }
 
       _setupColorScale() {
-        const step = (this.maxVal - this.minVal) / (this.palette.length - 1);
-        const domainStops = d3.range(this.minVal, this.maxVal + 1e-6, step);
-        this.colorScale = d3.scaleLinear()
-          .domain(domainStops)
-          .range(this.palette)
-          .interpolate(d3.interpolateHcl);
+        const midVal = (this.minVal + this.maxVal) / 2;
+        this.colorScale = d3.scaleDiverging()
+          .domain([this.maxVal, midVal, this.minVal]) 
+          .interpolator(d3.interpolateRdBu);
       }
 
       _createLayer() {
